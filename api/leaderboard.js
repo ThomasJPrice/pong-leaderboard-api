@@ -21,19 +21,15 @@ export default async function handler(req, res) {
     return res.status(200).json({ success: true });
   }
 
-  if (req.method === 'GET') {
-    const limit = parseInt(req.query.limit || '10', 10);
-    const data = await redis.zrevrange('leaderboard', 0, limit - 1, { withScores: true });
+  if (req.method === "GET") {
+    const data = await redis.zrange("leaderboard", 0, 9, {
+      rev: true, // reverse order (highest score first)
+      withScores: true, // include scores
+    });
 
-    const leaderboard = [];
-    for (let i = 0; i < data.length; i += 2) {
-      const user_id = data[i];
-      const score = Number(data[i + 1]);
-      const username = await redis.hget('usernames', user_id);
-      leaderboard.push({ username, score });
-    }
-
-    return res.status(200).json(leaderboard);
+    res.status(200).json(data);
+  } else {
+    res.status(405).json({ error: "Method not allowed" });
   }
 
   res.status(405).json({ error: 'Method not allowed' });
