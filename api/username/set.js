@@ -6,6 +6,8 @@ const redis = new Redis({
 });
 
 export default async function handler(req, res) {
+  // TEMP: Log incoming headers for debugging
+  console.log('Incoming headers:', req.headers);
   // API secret check
   const apiSecret = req.headers['x-api-secret'];
   if (!apiSecret || apiSecret !== process.env.API_SECRET) {
