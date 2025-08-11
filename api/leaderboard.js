@@ -6,6 +6,11 @@ const redis = new Redis({
 });
 
 export default async function handler(req, res) {
+  // API secret check
+  const apiSecret = req.headers['x-api-secret'];
+  if (!apiSecret || apiSecret !== process.env.API_SECRET) {
+    return res.status(401).json({ error: 'Unauthorized' });
+  }
   if (req.method === 'POST') {
     const { user_id, username, score } = req.body;
 
