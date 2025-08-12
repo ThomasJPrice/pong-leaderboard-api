@@ -8,13 +8,23 @@ const redis = new Redis({
 export default async function handler(req, res) {
   // TEMP: Log incoming headers for debugging
   console.log('Incoming headers:', req.headers);
-  // API secret check
-  const apiSecret = req.headers['x-api-secret'];
-  if (!apiSecret || apiSecret !== process.env.API_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
+
+  // User ID check (must be present in every request)
+  const user_id = req.method === 'GET'
+    ? (req.query?.user_id || req.body?.user_id)
+    : req.body?.user_id;
+
+  if (!user_id) {
+    return res.status(401).json({ error: 'Unauthorized: user_id required' });
+  }
+
+  // Check if user_id exists in usernames table
+  const usernameExists = await redis.hget('usernames', user_id);
+  if (!usernameExists) {
+    return res.status(401).json({ error: 'Unauthorized: user_id not found' });
   }
   if (req.method === 'POST') {
-    const { user_id, username, score } = req.body;
+    const { username, score } = req.body;
 
     // Save username
     await redis.hset('usernames', { [user_id]: username });
@@ -29,9 +39,6 @@ export default async function handler(req, res) {
   }
 
   if (req.method === "GET") {
-    // For GET requests, check query parameters first, then body
-    const user_id = req.query?.user_id || req.body?.user_id;
-
     // Get top 10 scores with user IDs
     const topScores = await redis.zrange("leaderboard", 0, 9, {
       rev: true, // reverse order (highest score first)
@@ -48,7 +55,6 @@ export default async function handler(req, res) {
       const userId = topScores[i];
       const score = topScores[i + 1];
       const username = usernamesObj[userId]; // Access username by userId key
-      
       top.push({
         user_id: userId,
         username: username || 'Unknown',
@@ -56,24 +62,22 @@ export default async function handler(req, res) {
       });
     }
 
-    // Handle user-specific data only if user_id is provided
+    // Handle user-specific data
     let userScore = 0;
     let inTop = false;
     let userPosition = null;
-    
-    if (user_id) {
-      // Get the user's score
-      userScore = await redis.zscore('leaderboard', user_id) || 0;
-      
-      // Check if user is in top 10
-      inTop = topUserIds.includes(user_id);
-      
-      // Get user's position in the leaderboard (1-based ranking)
-      if (userScore > 0) {
-        userPosition = await redis.zrevrank('leaderboard', user_id);
-        if (userPosition !== null) {
-          userPosition = userPosition + 1; // Convert to 1-based ranking
-        }
+
+    // Get the user's score
+    userScore = await redis.zscore('leaderboard', user_id) || 0;
+
+    // Check if user is in top 10
+    inTop = topUserIds.includes(user_id);
+
+    // Get user's position in the leaderboard (1-based ranking)
+    if (userScore > 0) {
+      userPosition = await redis.zrevrank('leaderboard', user_id);
+      if (userPosition !== null) {
+        userPosition = userPosition + 1; // Convert to 1-based ranking
       }
     }
 

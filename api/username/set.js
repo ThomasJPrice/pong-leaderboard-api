@@ -8,21 +8,32 @@ const redis = new Redis({
 export default async function handler(req, res) {
   // TEMP: Log incoming headers for debugging
   console.log('Incoming headers:', req.headers);
-  // API secret check
-  const apiSecret = req.headers['x-api-secret'];
-  if (!apiSecret || apiSecret !== process.env.API_SECRET) {
-    return res.status(401).json({ error: 'Unauthorized' });
+
+  // User ID check (must be present in every request)
+  const user_id = req.method === 'GET'
+    ? (req.query?.user_id || req.body?.user_id)
+    : req.body?.user_id;
+
+  if (!user_id) {
+    return res.status(401).json({ error: 'Unauthorized: user_id required' });
   }
+
+  // Check if user_id exists in usernames table
+  const usernameExists = await redis.hget('usernames', user_id);
+  if (!usernameExists) {
+    return res.status(401).json({ error: 'Unauthorized: user_id not found' });
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ error: "Method not allowed" });
   }
 
-  const { user_id, username } = req.body;
+  const { username } = req.body;
 
-  if (!user_id || !username) {
+  if (!username) {
     return res.status(400).json({ 
       success: false, 
-      error: "user_id and username are required" 
+      error: "username is required" 
     });
   }
 
