@@ -26,7 +26,7 @@ export default async function handler(req, res) {
     const user_id = req.query?.user_id || req.body?.user_id;
 
     // Get top 10 scores with user IDs
-    const topScores = await redis.zrange("leaderboard", 0, 9, {
+    const topScores = await redis.zrange("leaderboard", 0, 99, {
       rev: true, // reverse order (highest score first)
       withScores: true, // include scores
     });
